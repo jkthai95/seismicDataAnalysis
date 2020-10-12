@@ -3,21 +3,22 @@ import os
 import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
+import glob
 
 
-def serialize_example(seismic, label, height, width):
+def serialize_example(seismic, label, width, height):
     """
     Creates a tf.train.Example message ready to be written to a file.
     :param seismic: Seismic image.
     :param label:   Label image.
-    :param height:  Height of image.
     :param width:   Width of image.
+    :param height:  Height of image.
     :return:        tf.train.Example message.
     """
     # Create dictionary mapping for each feature
     feature = {
-        'height': tf.train.Feature(int64_list=tf.train.Int64List(value=[height])),
-        'width': tf.train.Feature(int64_list=tf.train.Int64List(value=[width])),
+        'width': tf.train.Feature(int64_list=tf.train.Int64List(value=[height])),
+        'height': tf.train.Feature(int64_list=tf.train.Int64List(value=[width])),
         'seismic': tf.train.Feature(float_list=tf.train.FloatList(value=seismic.reshape(-1))),
         'label': tf.train.Feature(float_list=tf.train.FloatList(value=label.reshape(-1)))
     }
@@ -50,10 +51,39 @@ def write_dataset_to_tfrecord(seismic_data, labels, output_filepath):
     print("(Dataset) Done generating {}.\n".format(output_filepath))
 
 
+feature_description = {
+    'width': tf.io.FixedLenFeature([], tf.int64),
+    'height': tf.io.FixedLenFeature([], tf.int64),
+    'seismic': tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
+    'label': tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True)
+}
+
+def parse_tfrecord(example_proto):
+    return tf.io.parse_example(example_proto, feature_description)
+
+
 class Dataset:
     def __init__(self, config=Config.Config()):
         # Project configurations
         self.config = config
+
+    def acquire_tfrecord_dataset(self, partition):
+        """
+        Acquire tf.data.TFRecordDataset for specific partition.
+        :param partition: Which partition? "train", "valid", or "test"
+        :return: tf.data.TFRecordDataset for specific partition.
+        """
+        if 'train' in partition:
+            filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'train', "*.tfrecord"))
+        elif 'valid' in partition:
+            filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'valid', "*.tfrecord"))
+        else:
+            filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'test', "*.tfrecord"))
+
+        tfrecord_dataset = tf.data.TFRecordDataset(filenames)
+        tfrecord_dataset = tfrecord_dataset.map(parse_tfrecord)
+
+        return tfrecord_dataset
 
     def convert_numpy_to_tfrecord(self, overwrite=True):
         """
@@ -71,12 +101,12 @@ class Dataset:
         Converts numpy dataset to tfrecord dataset for training set.
         """
         # Input training file paths (Numpy)
-        train_data_fp = os.path.join(self.config.dataDirRaw, 'train', 'train_seismic.npy')
-        train_labels_fp = os.path.join(self.config.dataDirRaw, 'train', 'train_labels.npy')
+        train_data_fp = os.path.join(self.config.data_dir_raw, 'train', 'train_seismic.npy')
+        train_labels_fp = os.path.join(self.config.data_dir_raw, 'train', 'train_labels.npy')
 
         # Output file directories (TFRecord)
-        train_tfrecord_dir = os.path.join(self.config.dataDirConverted, 'train')
-        valid_tfrecord_dir = os.path.join(self.config.dataDirConverted, 'valid')
+        train_tfrecord_dir = os.path.join(self.config.data_dir_converted, 'train')
+        valid_tfrecord_dir = os.path.join(self.config.data_dir_converted, 'valid')
 
         # Output file paths (TFRecord)
         train_tfrecord_fp = os.path.join(train_tfrecord_dir, 'train.tfrecord')
@@ -98,7 +128,7 @@ class Dataset:
 
         # Split data into training and validation data
         train_data_split, valid_data_split, train_labels_split, valid_labels_split = \
-            train_test_split(train_data, train_labels, test_size=self.config.valRatio, random_state=self.config.seed)
+            train_test_split(train_data, train_labels, test_size=self.config.val_ratio, random_state=self.config.seed)
 
         # Convert training set to TFRecord
         if not overwrite and os.path.exists(train_tfrecord_fp):
@@ -114,7 +144,7 @@ class Dataset:
         """
 
         # Output file directory (TFRecord)
-        test_tfrecord_dir = os.path.join(self.config.dataDirConverted, 'test')
+        test_tfrecord_dir = os.path.join(self.config.data_dir_converted, 'test')
 
         # Ensure directories exists
         if not os.path.isdir(test_tfrecord_dir):
@@ -123,8 +153,8 @@ class Dataset:
         # There are 2 testing sets.
         for i in range(1, 3):
             # Input file paths (Numpy)
-            test_data_fp = os.path.join(self.config.dataDirRaw, 'test_once', 'test{}_seismic.npy'.format(i))
-            test_labels_fp = os.path.join(self.config.dataDirRaw, 'test_once', 'test{}_labels.npy'.format(i))
+            test_data_fp = os.path.join(self.config.data_dir_raw, 'test_once', 'test{}_seismic.npy'.format(i))
+            test_labels_fp = os.path.join(self.config.data_dir_raw, 'test_once', 'test{}_labels.npy'.format(i))
 
             # Output file paths (TFRecord)
             test_tfrecord_fp = os.path.join(test_tfrecord_dir, 'test{}.tfrecord'.format(i))

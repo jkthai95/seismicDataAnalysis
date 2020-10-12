@@ -2,15 +2,31 @@
 
 class Config:
     def __init__(self):
+        # ----- Parameters -----
         # Path to original (numpy) dataset for Facies classification
         # From: https://github.com/yalaudah/facies_classification_benchmark
-        self.dataDirRaw = './data'
+        self.data_dir_raw = './data'
 
         # Path to converted TFRecord dataset
-        self.dataDirConverted = './data_converted'
+        self.data_dir_converted = './data_converted'
 
         # How much of training data is used for validation
-        self.valRatio = 0.1
+        self.val_ratio = 0.1
 
         # Fix random seed to have deterministic datasets
         self.seed = 2020
+
+        # Class names
+        self.class_names = ['Upper North Sea Group',
+                            'Middle North Sea Group',
+                            'Lower North Sea Group',
+                            'Rijnland & Chalk Group',
+                            'Scruff',
+                            'Zechstein']
+
+        # ----- Constants -----
+        self.num_classes = len(self.class_names)
+
+
+
+
