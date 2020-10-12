@@ -51,6 +51,7 @@ def write_dataset_to_tfrecord(seismic_data, labels, output_filepath):
     print("(Dataset) Done generating {}.\n".format(output_filepath))
 
 
+# Feature description used to parse TFRecords.
 feature_description = {
     'width': tf.io.FixedLenFeature([], tf.int64),
     'height': tf.io.FixedLenFeature([], tf.int64),
@@ -58,7 +59,13 @@ feature_description = {
     'label': tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True)
 }
 
+
 def parse_tfrecord(example_proto):
+    """
+    Parses serialized example into a dictionary of tensors.
+    :param example_proto: Serialized example.
+    :return: Dictionary of tensors.
+    """
     return tf.io.parse_example(example_proto, feature_description)
 
 
