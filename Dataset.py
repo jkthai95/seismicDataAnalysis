@@ -90,6 +90,17 @@ def parse_tfrecord(example_proto):
     return example
 
 
+def normalize_labels(labels, num_classes):
+    """
+    Normalizes labels between [-1, 1] based on number of classes.
+    :param labels: Default labels.
+    :param num_classes: Number of classes.
+    :return: Normalized labels.
+    """
+    normalized_labels = labels.astype(np.float)
+    normalized_labels = 2 * normalized_labels / (num_classes - 1) - 1
+    return normalized_labels
+
 class Dataset:
     def __init__(self, config=Config.Config()):
         # Project configurations
@@ -156,6 +167,9 @@ class Dataset:
         train_data = np.load(train_data_fp)
         train_labels = np.load(train_labels_fp)
 
+        # Normalize labels
+        train_labels = normalize_labels(train_labels, self.config.num_classes)
+
         # Split data into training and validation data
         train_data_split, valid_data_split, train_labels_split, valid_labels_split = \
             train_test_split(train_data, train_labels, test_size=self.config.val_ratio, random_state=self.config.seed)
@@ -195,6 +209,9 @@ class Dataset:
             # Load data
             test_data = np.load(test_data_fp)
             test_labels = np.load(test_labels_fp)
+
+            # Normalize labels
+            test_labels = normalize_labels(test_labels, self.config.num_classes)
 
             # Convert to TFRecord
             write_dataset_to_tfrecord(test_data, test_labels, test_tfrecord_fp)

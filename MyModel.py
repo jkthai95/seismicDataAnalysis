@@ -49,13 +49,8 @@ class MyModel:
         self.drop_rate = drop_rate
 
     def get_model(self, inputs):
-        # Build stem
-        x = layers.Conv2D(32, 3, strides=(1, 1), padding='same', use_bias=False, kernel_initializer='he_normal')(inputs)
-        x = layers.BatchNormalization()(x)
-        x = layers.Activation(activations.relu)(x)
-
         # Downsampling layers
-        down1 = conv_block_down(x, 64, 2, self.drop_rate)
+        down1 = conv_block_down(inputs, 64, 2, self.drop_rate)
         down2 = conv_block_down(down1, 128, 2, self.drop_rate)
 
         # Bottleneck layer
@@ -69,7 +64,7 @@ class MyModel:
         up1 = conv_block_up(up1, 64, 2, self.drop_rate)
 
         # Build top
-        x = crop_and_concat(up1, x)
+        x = crop_and_concat(up1, inputs)
         x = layers.Conv2D(32, 3, padding='same', use_bias=False, kernel_initializer='he_normal')(x)
         x = layers.Activation(activations.relu)(x)
         if self.drop_rate and (self.drop_rate > 0):

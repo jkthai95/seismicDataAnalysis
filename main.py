@@ -2,6 +2,8 @@ import Config
 import Dataset
 import MyModel
 import tensorflow as tf
+import numpy as np
+import os
 
 
 def limit_gpu():
@@ -18,6 +20,7 @@ def limit_gpu():
             print(e)
 
 def main():
+    # Limit GPU usage
     limit_gpu()
 
     # Project configurations
