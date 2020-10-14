@@ -24,6 +24,11 @@ class Config:
                             'Scruff',
                             'Zechstein']
 
+        # Training parameters
+        self.num_epochs = 10
+        self.shuffle_buffer_size = 2048
+        self.batch_size = 4
+
         # ----- Constants -----
         self.num_classes = len(self.class_names)
 

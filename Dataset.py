@@ -112,7 +112,10 @@ class Dataset:
         :param partition: Which partition? "train", "valid", "test1", or "test2"
         :return: tf.data.TFRecordDataset for specific partition.
         """
+        is_train_data = False
+
         if 'train' in partition:
+            is_train_data = True
             filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'train', "*.tfrecord"))
         elif 'valid' in partition:
             filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'valid', "*.tfrecord"))
@@ -121,8 +124,23 @@ class Dataset:
         elif 'test2' in partition:
             filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'test2', "*.tfrecord"))
 
+        # Create TFRecord Dataset
         tfrecord_dataset = tf.data.TFRecordDataset(filenames)
         tfrecord_dataset = tfrecord_dataset.map(parse_tfrecord)
+
+        if is_train_data:
+            # Cache parsed data into memory
+            tfrecord_dataset = tfrecord_dataset.cache()
+
+            # shuffle dataset
+            tfrecord_dataset = tfrecord_dataset.shuffle(self.config.shuffle_buffer_size)
+
+        # Batch data
+        tfrecord_dataset = tfrecord_dataset.batch(self.config.batch_size)
+
+        if not is_train_data:
+            # Cache dataset into memory
+            tfrecord_dataset = tfrecord_dataset.cache()
 
         return tfrecord_dataset
 
