@@ -1,4 +1,3 @@
-import Config
 import os
 import numpy as np
 import tensorflow as tf
@@ -101,135 +100,140 @@ def normalize_labels(labels, num_classes):
     normalized_labels = 2 * normalized_labels / (num_classes - 1) - 1
     return normalized_labels
 
-class Dataset:
-    def __init__(self, config=Config.Config()):
-        # Project configurations
-        self.config = config
 
-    def acquire_tfrecord_dataset(self, partition):
-        """
-        Acquire tf.data.TFRecordDataset for specific partition.
-        :param partition: Which partition? "train", "valid", "test1", or "test2"
-        :return: tf.data.TFRecordDataset for specific partition.
-        """
-        is_train_data = False
+def acquire_tfrecord_dataset(partition, config):
+    """
+    Acquire tf.data.TFRecordDataset for specific partition.
+    :param partition: Which partition? "train", "valid", "test1", or "test2"
+    :param config: Project configurations
+    :return: tf.data.TFRecordDataset for specific partition.
+    """
+    is_train_data = False
 
-        if 'train' in partition:
-            is_train_data = True
-            filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'train', "*.tfrecord"))
-        elif 'valid' in partition:
-            filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'valid', "*.tfrecord"))
-        elif 'test1' in partition:
-            filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'test1', "*.tfrecord"))
-        elif 'test2' in partition:
-            filenames = glob.glob(os.path.join(self.config.data_dir_converted, 'test2', "*.tfrecord"))
+    if 'train' in partition:
+        is_train_data = True
+        filenames = glob.glob(os.path.join(config.data_dir_converted, 'train', "*.tfrecord"))
+    elif 'valid' in partition:
+        filenames = glob.glob(os.path.join(config.data_dir_converted, 'valid', "*.tfrecord"))
+    elif 'test1' in partition:
+        filenames = glob.glob(os.path.join(config.data_dir_converted, 'test1', "*.tfrecord"))
+    elif 'test2' in partition:
+        filenames = glob.glob(os.path.join(config.data_dir_converted, 'test2', "*.tfrecord"))
 
-        # Create TFRecord Dataset
-        tfrecord_dataset = tf.data.TFRecordDataset(filenames)
-        tfrecord_dataset = tfrecord_dataset.map(parse_tfrecord)
+    # Create TFRecord Dataset
+    tfrecord_dataset = tf.data.TFRecordDataset(filenames)
+    tfrecord_dataset = tfrecord_dataset.map(parse_tfrecord)
 
-        if is_train_data:
-            # Cache parsed data into memory
-            tfrecord_dataset = tfrecord_dataset.cache()
+    if is_train_data:
+        # Cache parsed data into memory
+        tfrecord_dataset = tfrecord_dataset.cache()
 
-            # shuffle dataset
-            tfrecord_dataset = tfrecord_dataset.shuffle(self.config.shuffle_buffer_size)
+        # shuffle dataset
+        tfrecord_dataset = tfrecord_dataset.shuffle(config.shuffle_buffer_size)
 
-        # Batch data
-        tfrecord_dataset = tfrecord_dataset.batch(self.config.batch_size)
+    # Batch data
+    tfrecord_dataset = tfrecord_dataset.batch(config.batch_size)
 
-        if not is_train_data:
-            # Cache dataset into memory
-            tfrecord_dataset = tfrecord_dataset.cache()
+    if not is_train_data:
+        # Cache dataset into memory
+        tfrecord_dataset = tfrecord_dataset.cache()
 
-        return tfrecord_dataset
+    return tfrecord_dataset
 
-    def convert_numpy_to_tfrecord(self, overwrite=True):
-        """
-        Converts numpy datasets to tfrecord datasets for training, test #1, and test #2 sets.
-        Note: dataset is of shape: (inline, crossline, depth)
-        """
-        # Convert testing sets
-        self.convert_numpy_to_tfrecord_test_set(overwrite)
 
-        # Convert training set
-        self.convert_numpy_to_tfrecord_train_set(overwrite)
+def convert_numpy_to_tfrecord(config, overwrite=False):
+    """
+    Converts numpy datasets to tfrecord datasets for training, test #1, and test #2 sets.
+    Note: dataset is of shape: (inline, crossline, depth)
+    :param config: Project configurations
+    :param overwrite: Do we overwrite existing files?
+    """
+    # Convert testing sets
+    convert_numpy_to_tfrecord_test_set(config, overwrite)
 
-    def convert_numpy_to_tfrecord_train_set(self, overwrite=True):
-        """
-        Converts numpy dataset to tfrecord dataset for training set.
-        """
-        # Input training file paths (Numpy)
-        train_data_fp = os.path.join(self.config.data_dir_raw, 'train', 'train_seismic.npy')
-        train_labels_fp = os.path.join(self.config.data_dir_raw, 'train', 'train_labels.npy')
+    # Convert training set
+    convert_numpy_to_tfrecord_train_set(config, overwrite)
 
-        # Output file directories (TFRecord)
-        train_tfrecord_dir = os.path.join(self.config.data_dir_converted, 'train')
-        valid_tfrecord_dir = os.path.join(self.config.data_dir_converted, 'valid')
+
+def convert_numpy_to_tfrecord_train_set(config, overwrite=True):
+    """
+    Converts numpy dataset to tfrecord dataset for training set.
+    :param config: Project configurations
+    :param overwrite: Do we overwrite existing files?
+    """
+    # Input training file paths (Numpy)
+    train_data_fp = os.path.join(config.data_dir_raw, 'train', 'train_seismic.npy')
+    train_labels_fp = os.path.join(config.data_dir_raw, 'train', 'train_labels.npy')
+
+    # Output file directories (TFRecord)
+    train_tfrecord_dir = os.path.join(config.data_dir_converted, 'train')
+    valid_tfrecord_dir = os.path.join(config.data_dir_converted, 'valid')
+
+    # Output file paths (TFRecord)
+    train_tfrecord_fp = os.path.join(train_tfrecord_dir, 'train.tfrecord')
+    valid_tfrecord_fp = os.path.join(valid_tfrecord_dir, 'valid.tfrecord')
+
+    if not overwrite and os.path.exists(train_tfrecord_fp) and os.path.exists(train_tfrecord_fp):
+        # TFRecords exists do not overwrite them
+        return
+
+    # Ensure directories exists
+    if not os.path.isdir(train_tfrecord_dir):
+        os.makedirs(train_tfrecord_dir)
+    if not os.path.isdir(valid_tfrecord_dir):
+        os.makedirs(valid_tfrecord_dir)
+
+    # Load training data
+    train_data = np.load(train_data_fp)
+    train_labels = np.load(train_labels_fp)
+
+    # Normalize labels
+    train_labels = normalize_labels(train_labels, config.num_classes)
+
+    # Split data into training and validation data
+    train_data_split, valid_data_split, train_labels_split, valid_labels_split = \
+        train_test_split(train_data, train_labels, test_size=config.val_ratio, random_state=config.seed)
+
+    # Convert training set to TFRecord
+    if overwrite or not os.path.exists(train_tfrecord_fp):
+        write_dataset_to_tfrecord(train_data_split, train_labels_split, train_tfrecord_fp)
+
+    # Convert validation set to TFRecord
+    if overwrite or not os.path.exists(valid_tfrecord_fp):
+        write_dataset_to_tfrecord(valid_data_split, valid_labels_split, valid_tfrecord_fp)
+
+def convert_numpy_to_tfrecord_test_set(config, overwrite=True):
+    """
+    Converts numpy dataset to tfrecord dataset for testing set.
+    :param config: Project configurations
+    :param overwrite: Do we overwrite existing files?
+    """
+    # There are 2 testing sets.
+    for i in range(1, 3):
+        # Output file directory (TFRecord)
+        test_tfrecord_dir = os.path.join(config.data_dir_converted, 'test{}'.format(i))
+
+        # Ensure directories exists
+        if not os.path.isdir(test_tfrecord_dir):
+            os.makedirs(test_tfrecord_dir)
+
+        # Input file paths (Numpy)
+        test_data_fp = os.path.join(config.data_dir_raw, 'test_once', 'test{}_seismic.npy'.format(i))
+        test_labels_fp = os.path.join(config.data_dir_raw, 'test_once', 'test{}_labels.npy'.format(i))
 
         # Output file paths (TFRecord)
-        train_tfrecord_fp = os.path.join(train_tfrecord_dir, 'train.tfrecord')
-        valid_tfrecord_fp = os.path.join(valid_tfrecord_dir, 'valid.tfrecord')
+        test_tfrecord_fp = os.path.join(test_tfrecord_dir, 'test{}.tfrecord'.format(i))
 
-        if not overwrite and os.path.exists(train_tfrecord_fp) and os.path.exists(train_tfrecord_fp):
+        if not overwrite and os.path.exists(test_tfrecord_fp):
             # TFRecords exists do not overwrite them
             return
 
-        # Ensure directories exists
-        if not os.path.isdir(train_tfrecord_dir):
-            os.makedirs(train_tfrecord_dir)
-        if not os.path.isdir(valid_tfrecord_dir):
-            os.makedirs(valid_tfrecord_dir)
-
-        # Load training data
-        train_data = np.load(train_data_fp)
-        train_labels = np.load(train_labels_fp)
+        # Load data
+        test_data = np.load(test_data_fp)
+        test_labels = np.load(test_labels_fp)
 
         # Normalize labels
-        train_labels = normalize_labels(train_labels, self.config.num_classes)
+        test_labels = normalize_labels(test_labels, config.num_classes)
 
-        # Split data into training and validation data
-        train_data_split, valid_data_split, train_labels_split, valid_labels_split = \
-            train_test_split(train_data, train_labels, test_size=self.config.val_ratio, random_state=self.config.seed)
-
-        # Convert training set to TFRecord
-        if overwrite or not os.path.exists(train_tfrecord_fp):
-            write_dataset_to_tfrecord(train_data_split, train_labels_split, train_tfrecord_fp)
-
-        # Convert validation set to TFRecord
-        if overwrite or not os.path.exists(valid_tfrecord_fp):
-            write_dataset_to_tfrecord(valid_data_split, valid_labels_split, valid_tfrecord_fp)
-
-    def convert_numpy_to_tfrecord_test_set(self, overwrite=True):
-        """
-        Converts numpy dataset to tfrecord dataset for testing set.
-        """
-        # There are 2 testing sets.
-        for i in range(1, 3):
-            # Output file directory (TFRecord)
-            test_tfrecord_dir = os.path.join(self.config.data_dir_converted, 'test{}'.format(i))
-
-            # Ensure directories exists
-            if not os.path.isdir(test_tfrecord_dir):
-                os.makedirs(test_tfrecord_dir)
-
-            # Input file paths (Numpy)
-            test_data_fp = os.path.join(self.config.data_dir_raw, 'test_once', 'test{}_seismic.npy'.format(i))
-            test_labels_fp = os.path.join(self.config.data_dir_raw, 'test_once', 'test{}_labels.npy'.format(i))
-
-            # Output file paths (TFRecord)
-            test_tfrecord_fp = os.path.join(test_tfrecord_dir, 'test{}.tfrecord'.format(i))
-
-            if not overwrite and os.path.exists(test_tfrecord_fp):
-                # TFRecords exists do not overwrite them
-                return
-
-            # Load data
-            test_data = np.load(test_data_fp)
-            test_labels = np.load(test_labels_fp)
-
-            # Normalize labels
-            test_labels = normalize_labels(test_labels, self.config.num_classes)
-
-            # Convert to TFRecord
-            write_dataset_to_tfrecord(test_data, test_labels, test_tfrecord_fp)
+        # Convert to TFRecord
+        write_dataset_to_tfrecord(test_data, test_labels, test_tfrecord_fp)

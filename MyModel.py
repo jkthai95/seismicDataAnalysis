@@ -19,58 +19,62 @@ def crop_and_concat(x1, x2):
     return layers.Concatenate()([x1_crop, x2])
 
 
-def conv_block_down(inputs, num_filters, stride=2, drop_rate=None):
+def conv_block_down(inputs, num_filters, stride=2, drop_rate=None, training=False):
     x = layers.Conv2D(num_filters, 3, strides=(stride, stride), padding='same', use_bias=False, kernel_initializer='he_normal')(inputs)
     x = layers.BatchNormalization()(x)
     x = layers.Activation(activations.relu)(x)
 
-    if drop_rate and (drop_rate > 0):
+    if training and drop_rate and (drop_rate > 0):
         x = layers.Dropout(drop_rate)(x)
 
     return x
 
 
-def conv_block_up(inputs, num_filters, stride=2, drop_rate=None):
+def conv_block_up(inputs, num_filters, stride=2, drop_rate=None, training=False):
     x = layers.Conv2DTranspose(num_filters, 3, strides=(stride, stride), padding='same', use_bias=False, kernel_initializer='he_normal')(inputs)
     x = layers.BatchNormalization()(x)
     x = layers.Activation(activations.relu)(x)
 
-    if drop_rate and (drop_rate > 0):
+    if training and drop_rate and (drop_rate > 0):
         x = layers.Dropout(drop_rate)(x)
 
     return x
 
 
-class MyModel:
+class MyModel(tf.keras.Model):
     def __init__(self, drop_rate=None):
         super(MyModel, self).__init__()
 
         # Parameters
         self.drop_rate = drop_rate
 
-    def get_model(self, inputs):
+    def call(self, inputs, training=False):
+        # Stem layer
+        x = conv_block_down(inputs, 32, 1, self.drop_rate, training)
+
         # Downsampling layers
-        down1 = conv_block_down(inputs, 64, 2, self.drop_rate)
-        down2 = conv_block_down(down1, 128, 2, self.drop_rate)
+        down1 = conv_block_down(x, 32, 2, self.drop_rate, training)
+        down2 = conv_block_down(down1, 64, 2, self.drop_rate, training)
 
         # Bottleneck layer
-        bottleneck = conv_block_down(down2, 256, 1, self.drop_rate)
-        bottleneck = conv_block_up(bottleneck, 128, 2, self.drop_rate)
+        bottleneck = conv_block_down(down2, 128, 1, self.drop_rate, training)
+        bottleneck = conv_block_up(bottleneck, 128, 2, self.drop_rate, training)
 
         # Upsampling layers
         up2 = crop_and_concat(bottleneck, down2)
-        up2 = conv_block_up(up2, 64, 2, self.drop_rate)
+        up2 = conv_block_up(up2, 64, 2, self.drop_rate, training)
         up1 = crop_and_concat(up2, down1)
-        up1 = conv_block_up(up1, 64, 2, self.drop_rate)
+        up1 = conv_block_up(up1, 32, 2, self.drop_rate, training)
 
         # Build top
         x = crop_and_concat(up1, inputs)
         x = layers.Conv2D(32, 3, padding='same', use_bias=False, kernel_initializer='he_normal')(x)
         x = layers.Activation(activations.relu)(x)
-        if self.drop_rate and (self.drop_rate > 0):
+        if training and self.drop_rate and (self.drop_rate > 0):
             x = layers.Dropout(self.drop_rate)(x)
         outputs = layers.Conv2D(1, 3, padding='same', activation=activations.tanh)(x)
 
-        model = tf.keras.Model(inputs=inputs, outputs=outputs)
+        return outputs
 
-        return model
+    def get_config(self):
+        pass
