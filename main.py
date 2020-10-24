@@ -31,8 +31,7 @@ def main():
     # Train model
     Train.train_model(config)
 
-
-
+    # Test model
 
 if __name__ == '__main__':
     main()

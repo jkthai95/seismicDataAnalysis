@@ -7,18 +7,28 @@ import Dataset
 
 
 def loss(model, seismic_data, labels, loss_function):
+    """
+    Calculates training loss.
+    """
     labels_pred = model(seismic_data, training=True)
 
     return loss_function(y_true=labels, y_pred=labels_pred)
 
 
 def grad(model, inputs, targets, loss_function):
+    """
+    Acquires training loss and gradient.
+    """
     with tf.GradientTape() as tape:
         loss_value = loss(model, inputs, targets, loss_function)
     return loss_value, tape.gradient(loss_value, model.trainable_variables)
 
 
 def train_model(config):
+    """
+    Trains model.
+    :param config: Project configurations
+    """
     # Acquire TFRecord dataset
     train_dataset = Dataset.acquire_tfrecord_dataset('train', config)
     valid_dataset = Dataset.acquire_tfrecord_dataset('valid', config)
@@ -74,6 +84,9 @@ def train_model(config):
 
         if valid_loss.result() < best_loss_result:
             # Validation loss improved, save model
+            print("Epoch {}: Best validation lost improved from {:5f} to {:5f}".format(epoch,
+                                                                                       best_loss_result,
+                                                                                       valid_loss.result()))
             best_loss_result = valid_loss.result()
             model.save_weights(config.model_path)
             num_epochs_wait = 0
@@ -84,7 +97,9 @@ def train_model(config):
         # Save results
         train_loss_results.append(epoch_loss_avg.result())
         valid_loss_results.append(valid_loss.result())
-        print("Epoch {}: Train loss = {:5f}, Valid loss = {:f}".format(epoch, epoch_loss_avg.result(), valid_loss.result()))
+        print("Epoch {}: Train loss = {:5f}, Valid loss = {:5f}".format(epoch,
+                                                                        epoch_loss_avg.result(),
+                                                                        valid_loss.result()))
 
         if num_epochs_wait >= config.patients:
             # Early stopping for training
